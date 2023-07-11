@@ -6,6 +6,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 public class OutboundPacket {
     public int packetID;
@@ -31,15 +32,23 @@ public class OutboundPacket {
 
     public byte[] getBytes() throws IOException {
         ByteArrayOutputStream packet_out = new ByteArrayOutputStream();
+        DataOutputStream packet_out_buff = new DataOutputStream(packet_out);
         byte[] raw = buffer.toByteArray();
 
-        VarNum.writeVarInt(new DataOutputStream(packet_out),
+        VarNum.writeVarInt(packet_out_buff,
                 raw.length + VarNum.varIntLength(packetID));
 
-        VarNum.writeVarInt(new DataOutputStream(packet_out), packetID);
+        VarNum.writeVarInt(packet_out_buff, packetID);
         packet_out.write(raw);
 
         return packet_out.toByteArray();
     }
 
+    public String toString() {
+        try {
+            return "OB:" + packetID + "/" + Arrays.toString(getBytes());
+        } catch (IOException e) {
+            return "OB:err";
+        }
+    }
 }

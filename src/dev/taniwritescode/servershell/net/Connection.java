@@ -4,12 +4,10 @@ import dev.taniwritescode.servershell.protocol.OutboundPacket;
 import dev.taniwritescode.servershell.protocol.PacketType;
 import dev.taniwritescode.servershell.util.VarNum;
 
-import javax.xml.crypto.Data;
 import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Logger;
 
 public class Connection extends Thread {
@@ -101,37 +99,23 @@ public class Connection extends Thread {
             logger.info("Got packet! " + desired_action);
             if (desired_action == 0x00) {
                 OutboundPacket statusResponse = new OutboundPacket(0x00, false);
-                statusResponse.writeString("""
-                        {
-                            "version": {
-                                "name": "1.19.4",
-                                "protocol": 762
-                            },
-                            "players": {
-                                "max": 100,
-                                "online": 5,
-                                "sample": [
-                                    {
-                                        "name": "thinkofdeath",
-                                        "id": "4566e69f-c907-48ee-8d71-d7ba5aa00d20"
-                                    }
-                                ]
-                            },
-                            "description": {
-                                "text": "Hello world"
-                            },
-                            "favicon": "data:image/png;base64,<data>",
-                            "enforcesSecureChat": true,
-                            "previewsChat": true
-                        }""");
-                out.write(statusResponse.getBytes());
-                // desired_action = in.readByte();
+                statusResponse.writeString("{\"version\": {\"name\": \"1.19.4\",\"protocol\": 762},\"players\": {\"max\": 100,\"online\": 5,\"sample\": [{\"name\": \"thinkofdeath\",\"id\": \"4566e69f-c907-48ee-8d71-d7ba5aa00d20\"}]},\"description\": {\"text\": \"Hello world\"},\"enforcesSecureChat\": true,\"previewsChat\": true}");
+                logger.info("Prepared response packet: " + Arrays.toString(statusResponse.getBytes()));
+
+                socket.getOutputStream().write(statusResponse.getBytes());
+
+                try {
+                    desired_action = in.readByte();
+                    logger.info("Got another packet! " + desired_action);
+                } catch (EOFException e) {
+                    logger.info("No further packets.");
+                }
             }
 
-//            if (desired_action == 0x01) {
-//                OutboundPacket pingResponsePacket = new OutboundPacket(0x01, false);
-//                out.write(pingResponsePacket.getBytes());
-//            }
+            if (desired_action == 0x01) {
+                OutboundPacket pingResponsePacket = new OutboundPacket(0x01, false);
+                socket.getOutputStream().write(pingResponsePacket.getBytes());
+            }
             socket.close();
 
         } catch (IOException e) {
