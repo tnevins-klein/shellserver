@@ -3,9 +3,12 @@ package dev.taniwritescode.servershell;
 import dev.taniwritescode.servershell.net.Connection;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Logger;
 
 public class Main {
@@ -21,10 +24,20 @@ public class Main {
         logger.info("Listening on port " + port);
 
         ServerSocket socket = new ServerSocket(25565);
+        socket.setSoTimeout(500);
+
         while (true) {
-            Socket s = socket.accept();
-            logger.info("Connected with " + s.getInetAddress() + ":" + s.getPort());
-            activeThreads.add(new Connection(s));
+            try {
+                Socket s = socket.accept();
+                logger.info("Connected with " + s.getInetAddress() + ":" + s.getPort());
+
+                Connection c = new Connection(s);
+                c.start();
+                activeThreads.add(c);
+
+            } catch (SocketTimeoutException e) {
+                // logger.warning("Connection timed out");
+            }
         }
     }
 }
