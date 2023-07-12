@@ -39,6 +39,8 @@ public class Main {
             } catch (SocketTimeoutException e) {
                 // logger.warning("Connection timed out");
             }
+
+            activeThreads.removeIf(t -> !t.isAlive());
         }
     }
 }
