@@ -30,6 +30,10 @@ public class OutboundPacket {
         wrapper.write(stringBytes);
     }
 
+    public void writeBytes(byte[] bytes) throws IOException {
+        wrapper.write(bytes);
+    }
+
     public byte[] getBytes() throws IOException {
         ByteArrayOutputStream packet_out = new ByteArrayOutputStream();
         DataOutputStream packet_out_buff = new DataOutputStream(packet_out);

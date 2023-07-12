@@ -6,6 +6,7 @@ import dev.taniwritescode.servershell.util.VarNum;
 
 import java.io.*;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.logging.Logger;
@@ -51,9 +52,12 @@ public class Connection extends Thread {
 
     public InboundPacket readPacket() throws IOException {
         int length = VarNum.readVarInt(in);
-        int packet_id = VarNum.readVarInt(in);
+        logger.info("Started reading packet: length " + length);
 
-        int data_length = length - VarNum.varIntLength(packet_id);
+        int packet_id = VarNum.readVarInt(in);
+        logger.info("Packet ID: " + packet_id);
+
+        int data_length = length - VarNum.varIntLength(packet_id) - 1;
         return new InboundPacket(in.readNBytes(data_length), packet_id);
     }
 
@@ -95,29 +99,30 @@ public class Connection extends Thread {
             }
 
             logger.info("Waiting for initial packet...");
-            byte desired_action = in.readByte();
-            logger.info("Got packet! " + desired_action);
-            if (desired_action == 0x00) {
+            InboundPacket next_packet = readPacket();
+            logger.info("Got packet! " + next_packet.toString());
+            if (next_packet.getPacketID() == 0x00) {
                 OutboundPacket statusResponse = new OutboundPacket(0x00, false);
-                statusResponse.writeString("{\"version\": {\"name\": \"1.19.4\",\"protocol\": 762},\"players\": {\"max\": 100,\"online\": 5,\"sample\": [{\"name\": \"thinkofdeath\",\"id\": \"4566e69f-c907-48ee-8d71-d7ba5aa00d20\"}]},\"description\": {\"text\": \"Hello world\"},\"enforcesSecureChat\": true,\"previewsChat\": true}");
+                statusResponse.writeString("{\"version\": {\"name\": \"1.19.4\",\"protocol\": 762},\"players\": {\"max\": 100,\"online\": 5,\"sample\": [{\"name\": \"thinkofdeath\",\"id\": \"4566e69f-c907-48ee-8d71-d7ba5aa00d20\"}]},\"description\": {\"text\": \"Hello world\"},\"favicon\": \"data:image/png;base64,<data>\",\"enforcesSecureChat\": true,\"previewsChat\": true}");
                 logger.info("Prepared response packet: " + Arrays.toString(statusResponse.getBytes()));
 
                 socket.getOutputStream().write(statusResponse.getBytes());
 
                 try {
-                    desired_action = in.readByte();
-                    logger.info("Got another packet! " + desired_action);
-                } catch (EOFException e) {
+                    next_packet = readPacket();
+                    logger.info("Got another packet! " + next_packet);
+                } catch (EOFException | SocketTimeoutException e) {
                     logger.info("No further packets.");
                 }
             }
 
-            if (desired_action == 0x01) {
+            if (next_packet.getPacketID() == 0x01) {
                 OutboundPacket pingResponsePacket = new OutboundPacket(0x01, false);
-                socket.getOutputStream().write(pingResponsePacket.getBytes());
+                pingResponsePacket.writeBytes(next_packet.getData());
+                out.write(pingResponsePacket.getBytes());
             }
             socket.close();
-
+            logger.info("Connection closed! Success?");
         } catch (IOException e) {
             e.printStackTrace();
         }
