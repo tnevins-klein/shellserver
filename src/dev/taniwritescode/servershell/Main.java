@@ -19,6 +19,9 @@ public class Main {
             port = Integer.parseInt(args[0]);
         }
 
+        System.setProperty("java.util.logging.SimpleFormatter.format",
+                "[%1$tF %1$tT] [%3$s/%4$s] %5$s %n");
+
         logger.info("Listening on port " + port);
 
         ServerSocket socket = new ServerSocket(25565);

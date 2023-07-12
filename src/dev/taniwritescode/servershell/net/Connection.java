@@ -1,7 +1,7 @@
 package dev.taniwritescode.servershell.net;
 
 import dev.taniwritescode.servershell.protocol.OutboundPacket;
-import dev.taniwritescode.servershell.protocol.PacketType;
+import dev.taniwritescode.servershell.protocol.Type;
 import dev.taniwritescode.servershell.util.VarNum;
 
 import java.io.*;
@@ -47,17 +47,12 @@ public class Connection extends Thread {
 
         in = new DataInputStream(socket.getInputStream());
         out = new DataOutputStream(socket.getOutputStream());
-        logger.info("Thread opened");
     }
 
     public InboundPacket readPacket() throws IOException {
         int length = VarNum.readVarInt(in);
-        logger.info("Started reading packet: length " + length);
-
         int packet_id = VarNum.readVarInt(in);
-        logger.info("Packet ID: " + packet_id);
-
-        int data_length = length - VarNum.varIntLength(packet_id) - 1;
+        int data_length = length - VarNum.varIntLength(packet_id);
         return new InboundPacket(in.readNBytes(data_length), packet_id);
     }
 
@@ -66,34 +61,35 @@ public class Connection extends Thread {
         return new String(read.readNBytes(stringLength), StandardCharsets.UTF_8);
     }
 
+    public int sendHandshake() throws IOException {
+        InboundPacket handshake = readPacket();
+
+        if (handshake.packetID != Type.Packet.HANDSHAKE) {
+            logger.warning("Instead of HANDSHAKE, got packet with ID " + handshake.packetID + ". Aborting.");
+            socket.close();
+            return 0;
+        }
+
+        logger.info(handshake.toString());
+        ByteArrayInputStream stream = new ByteArrayInputStream(handshake.getData());
+        DataInputStream read = new DataInputStream(stream);
+
+        int proto_version = VarNum.readVarInt(read);
+        String hostname = readString(read);
+        int port = read.readUnsignedShort();
+
+        logger.info("Handshake for " + hostname + ":" + port + " successful. Protocol version is " + proto_version + ".");
+
+        return VarNum.readVarInt(read);
+    }
+
     public void run() {
         logger = Logger.getLogger(this.toString());
 
         try {
-            InboundPacket handshake = readPacket();
-
-            if (handshake.packetID != PacketType.HANDSHAKE) {
-                logger.warning("Instead of HANDSHAKE, got packet with ID " + handshake.packetID + ". Aborting.");
-                socket.close();
-                return;
-            }
-
-            logger.info(handshake.toString());
-            ByteArrayInputStream stream = new ByteArrayInputStream(handshake.getData());
-            DataInputStream read = new DataInputStream(stream);
-
-            int proto_version = VarNum.readVarInt(read);
-            logger.info("Protocol version: " + proto_version);
-            String hostname = readString(read);
-            logger.info("Hostname: " + hostname);
-            int port = read.readUnsignedShort();
-            logger.info("Port: " + port);
-
-            logger.info("New connection has protocol version " + proto_version);
-
-            int next_state = VarNum.readVarInt(read);
-            logger.info("Desired state is " + next_state);
-            if (next_state != 1) {
+            int next_state = sendHandshake();
+            if (next_state == Type.HandshakeState.PLAY) {
+                logger.info("Client requested state PLAY. Aborting connection.");
                 socket.close();
                 return;
             }
@@ -101,12 +97,12 @@ public class Connection extends Thread {
             logger.info("Waiting for initial packet...");
             InboundPacket next_packet = readPacket();
             logger.info("Got packet! " + next_packet.toString());
-            if (next_packet.getPacketID() == 0x00) {
-                OutboundPacket statusResponse = new OutboundPacket(0x00, false);
+            if (next_packet.getPacketID() == Type.Packet.STATUS_REQUEST) {
+                OutboundPacket statusResponse = new OutboundPacket(Type.Packet.STATUS_RESPONSE, false);
                 statusResponse.writeString("{\"version\": {\"name\": \"1.19.4\",\"protocol\": 762},\"players\": {\"max\": 100,\"online\": 5,\"sample\": [{\"name\": \"thinkofdeath\",\"id\": \"4566e69f-c907-48ee-8d71-d7ba5aa00d20\"}]},\"description\": {\"text\": \"Hello world\"},\"favicon\": \"data:image/png;base64,<data>\",\"enforcesSecureChat\": true,\"previewsChat\": true}");
-                logger.info("Prepared response packet: " + Arrays.toString(statusResponse.getBytes()));
-
                 socket.getOutputStream().write(statusResponse.getBytes());
+
+                logger.info("Successfully wrote response packet.");
 
                 try {
                     next_packet = readPacket();
@@ -121,6 +117,15 @@ public class Connection extends Thread {
                 pingResponsePacket.writeBytes(next_packet.getData());
                 out.write(pingResponsePacket.getBytes());
             }
+
+            logger.info("We have another packet: " + readPacket());
+
+            OutboundPacket statusResponse = new OutboundPacket(Type.Packet.STATUS_RESPONSE, false);
+            statusResponse.writeString("{\"version\": {\"name\": \"1.19.4\",\"protocol\": 762},\"players\": {\"max\": 100,\"online\": 5,\"sample\": [{\"name\": \"thinkofdeath\",\"id\": \"4566e69f-c907-48ee-8d71-d7ba5aa00d20\"}]},\"description\": {\"text\": \"Hello world\"},\"favicon\": \"data:image/png;base64,<data>\",\"enforcesSecureChat\": true,\"previewsChat\": true}");
+            socket.getOutputStream().write(statusResponse.getBytes());
+
+            logger.info("Successfully wrote response packet.");
+
             socket.close();
             logger.info("Connection closed! Success?");
         } catch (IOException e) {

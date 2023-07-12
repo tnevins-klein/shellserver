@@ -59,6 +59,7 @@ public class VarNum {
     public static int varIntLength(int value) {
         int counter = 0;
         while (true) {
+            counter += 1;
             if ((value & ~SEGMENT_BITS) == 0) {
                 return counter;
             }
