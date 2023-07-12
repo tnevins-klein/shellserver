@@ -96,38 +96,37 @@ public class Connection extends Thread {
 
             logger.info("Waiting for initial packet...");
             InboundPacket next_packet = readPacket();
-            logger.info("Got packet! " + next_packet.toString());
             if (next_packet.getPacketID() == Type.Packet.STATUS_REQUEST) {
                 OutboundPacket statusResponse = new OutboundPacket(Type.Packet.STATUS_RESPONSE, false);
-                statusResponse.writeString("{\"version\": {\"name\": \"1.19.4\",\"protocol\": 762},\"players\": {\"max\": 100,\"online\": 5,\"sample\": [{\"name\": \"thinkofdeath\",\"id\": \"4566e69f-c907-48ee-8d71-d7ba5aa00d20\"}]},\"description\": {\"text\": \"Hello world\"},\"favicon\": \"data:image/png;base64,<data>\",\"enforcesSecureChat\": true,\"previewsChat\": true}");
+                statusResponse.writeString("{\"version\": {\"name\": \"1.20.1\",\"protocol\": 763},\"players\": {\"max\": -2,\"online\": 1000000000,\"sample\": [{\"name\": \"NotTani\",\"id\": \"c9c45533-ae58-42c0-874b-d9235f67996b\"}]},\"description\": {\"text\": \"Hello from hell (Java)\"},\"favicon\": \"data:image/png;base64,<data>\",\"enforcesSecureChat\": true,\"previewsChat\": true}");
                 socket.getOutputStream().write(statusResponse.getBytes());
 
-                logger.info("Successfully wrote response packet.");
+                logger.info("Successfully answered a STATUS_REQUEST packet.");
 
                 try {
                     next_packet = readPacket();
-                    logger.info("Got another packet! " + next_packet);
+                    logger.info("Received another packet (hopefully PING)");
                 } catch (EOFException | SocketTimeoutException e) {
                     logger.info("No further packets.");
                 }
             }
 
             if (next_packet.getPacketID() == 0x01) {
+                logger.info("Ping! Sending pong.");
                 OutboundPacket pingResponsePacket = new OutboundPacket(0x01, false);
                 pingResponsePacket.writeBytes(next_packet.getData());
                 out.write(pingResponsePacket.getBytes());
             }
 
-            logger.info("We have another packet: " + readPacket());
-
             OutboundPacket statusResponse = new OutboundPacket(Type.Packet.STATUS_RESPONSE, false);
-            statusResponse.writeString("{\"version\": {\"name\": \"1.19.4\",\"protocol\": 762},\"players\": {\"max\": 100,\"online\": 5,\"sample\": [{\"name\": \"thinkofdeath\",\"id\": \"4566e69f-c907-48ee-8d71-d7ba5aa00d20\"}]},\"description\": {\"text\": \"Hello world\"},\"favicon\": \"data:image/png;base64,<data>\",\"enforcesSecureChat\": true,\"previewsChat\": true}");
+
+            statusResponse.writeString("{\"version\": {\"name\": \"1.19.4\",\"protocol\": 762},\"players\": {\"max\": 100,\"online\": 5,\"sample\": [{\"name\": \"NotTani\",\"id\": \"c9c45533-ae58-42c0-874b-d9235f67996b\"}]},\"description\": {\"text\": \"Hello world\"},\"favicon\": \"data:image/png;base64,<data>\",\"enforcesSecureChat\": true,\"previewsChat\": true}");
             socket.getOutputStream().write(statusResponse.getBytes());
 
             logger.info("Successfully wrote response packet.");
 
             socket.close();
-            logger.info("Connection closed! Success?");
+            logger.info("Connection closed.");
         } catch (IOException e) {
             e.printStackTrace();
         }
